@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>참참참 대결</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      padding: 24px; font-family: "Noto Sans KR", system-ui, sans-serif;
+      color: #20243a; background: linear-gradient(135deg, #e8f0ff, #fff0f4);
+    }
+    .game {
+      width: min(100%, 760px); padding: 28px; border-radius: 28px;
+      background: rgba(255,255,255,.94); box-shadow: 0 18px 55px #39456b20;
+      text-align: center;
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 5vw, 42px); }
+    .sub { margin: 0 0 22px; color: #69718a; }
+    .arena {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+      padding: 20px; border-radius: 22px; background: #f4f6fc;
+    }
+    .character {
+      min-width: 0; padding: 16px 10px; border-radius: 18px; background: white;
+      border: 2px solid #e7eaf3;
+    }
+    .character h2 { margin: 0 0 12px; font-size: 18px; }
+    .face {
+      height: 110px; display: grid; place-items: center;
+      font-size: 66px; line-height: 1; transition: transform .28s ease;
+    }
+    .direction {
+      min-height: 34px; margin-top: 8px; font-size: 24px; font-weight: 800;
+      color: #5364d8;
+    }
+    .character.move-left .face { transform: rotate(-22deg) translateX(-10px); }
+    .character.move-right .face { transform: rotate(22deg) translateX(10px); }
+    .character.move-up .face { transform: translateY(-9px) scale(1.06); }
+    .character.move-center .face { transform: scale(1.08); }
+    .controls { margin: 22px 0 14px; }
+    .controls p { margin: 0 0 12px; font-weight: 700; }
+    .buttons { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    button {
+      border: 0; border-radius: 14px; padding: 13px 22px; min-width: 105px;
+      font: inherit; font-size: 17px; font-weight: 800; cursor: pointer;
+      color: white; background: #5968df; box-shadow: 0 5px 0 #3d4bb7;
+      transition: transform .1s, box-shadow .1s, opacity .1s;
+    }
+    button:hover { filter: brightness(1.06); }
+    button:active { transform: translateY(3px); box-shadow: 0 2px 0 #3d4bb7; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    #result {
+      min-height: 62px; display: grid; place-items: center; margin-top: 14px;
+      padding: 12px; border-radius: 16px; background: #fff4d9;
+      font-size: 20px; font-weight: 900;
+    }
+    .scoreboard {
+      display: flex; justify-content: center; gap: 28px; margin: 18px 0 4px;
+      font-weight: 700; color: #69718a;
+    }
+    .scoreboard strong { display: block; color: #252b45; font-size: 25px; }
+    .bottom { margin-top: 18px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .reset { background: #30384f; box-shadow: 0 5px 0 #1c2234; }
+    .hint { margin: 15px 0 0; color: #81889b; font-size: 13px; }
+    @media (max-width: 520px) {
+      .game { padding: 18px 14px; }
+      .arena { padding: 10px; gap: 8px; }
+      .character { padding: 14px 5px; }
+      .face { height: 90px; font-size: 54px; }
+      button { min-width: 88px; padding: 12px 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <h1>✊ 참참참 대결!</h1>
+    <p class="sub">당신은 공격! 컴퓨터는 수비! 방향을 골라 승부하세요.</p>
+
+    <section class="arena" aria-label="게임 화면">
+      <div class="character" id="player">
+        <h2>나 · 공격</h2>
+        <div class="face" id="playerFace">🧑</div>
+        <div class="direction" id="playerDirection">준비!</div>
+      </div>
+      <div class="character" id="computer">
+        <h2>컴퓨터 · 수비</h2>
+        <div class="face" id="computerFace">🤖</div>
+        <div class="direction" id="computerDirection">대기 중</div>
+      </div>
+    </section>
+
+    <div class="controls">
+      <p>공격할 방향을 선택하세요!</p>
+      <div class="buttons">
+        <button class="attack" data-dir="left">← 왼쪽</button>
+        <button class="attack" data-dir="up">↑ 정면</button>
+        <button class="attack" data-dir="right">오른쪽 →</button>
+      </div>
+    </div>
+
+    <div id="result" role="status" aria-live="polite">방향을 선택하면 대결이 시작됩니다!</div>
+
+    <div class="scoreboard">
+      <div>내 득점<strong id="playerScore">0</strong></div>
+      <div>컴퓨터 방어<strong id="computerScore">0</strong></div>
+    </div>
+
+    <div class="bottom">
+      <button class="reset" id="reset">점수 초기화</button>
+    </div>
+    <p class="hint">컴퓨터가 같은 방향으로 막으면 방어 성공! 다른 방향이면 공격 성공!</p>
+  </main>
+
+  <script>
+    const directions = {
+      left: { label: "왼쪽", arrow: "←", className: "move-left" },
+      up: { label: "정면", arrow: "↑", className: "move-up" },
+      right: { label: "오른쪽", arrow: "→", className: "move-right" }
+    };
+
+    const player = document.getElementById("player");
+    const computer = document.getElementById("computer");
+    const playerDirection = document.getElementById("playerDirection");
+    const computerDirection = document.getElementById("computerDirection");
+    const result = document.getElementById("result");
+    const playerScoreText = document.getElementById("playerScore");
+    const computerScoreText = document.getElementById("computerScore");
+    const attackButtons = document.querySelectorAll(".attack");
+
+    let playerScore = 0;
+    let computerScore = 0;
+    let busy = false;
+
+    function showMove(element, direction) {
+      element.classList.remove("move-left", "move-up", "move-right", "move-center");
+      void element.offsetWidth; // 애니메이션을 매번 다시 실행
+      element.classList.add(directions[direction].className);
+    }
+
+    function play(playerChoice) {
+      if (busy) return;
+      busy = true;
+      attackButtons.forEach(button => button.disabled = true);
+
+      const choices = Object.keys(directions);
+      const computerChoice = choices[Math.floor(Math.random() * choices.length)];
+
+      playerDirection.textContent = "준비...";
+      computerDirection.textContent = "준비...";
+      result.textContent = "하나, 둘, 셋!";
+
+      window.setTimeout(() => {
+        showMove(player, playerChoice);
+        showMove(computer, computerChoice);
+        playerDirection.textContent = directions[playerChoice].arrow + " " + directions[playerChoice].label;
+        computerDirection.textContent = directions[computerChoice].arrow + " " + directions[computerChoice].label;
+
+        if (playerChoice === computerChoice) {
+          computerScore++;
+          result.textContent = "🛡️ 컴퓨터 방어 성공! 공격이 막혔어요.";
+        } else {
+          playerScore++;
+          result.textContent = "🎉 공격 성공! 컴퓨터의 수비를 뚫었어요!";
+        }
+
+        playerScoreText.textContent = playerScore;
+        computerScoreText.textContent = computerScore;
+        busy = false;
+        attackButtons.forEach(button => button.disabled = false);
+      }, 550);
+    }
+
+    attackButtons.forEach(button => {
+      button.addEventListener("click", () => play(button.dataset.dir));
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      if (busy) return;
+      playerScore = 0;
+      computerScore = 0;
+      playerScoreText.textContent = "0";
+      computerScoreText.textContent = "0";
+      playerDirection.textContent = "준비!";
+      computerDirection.textContent = "대기 중";
+      player.classList.remove("move-left", "move-up", "move-right", "move-center");
+      computer.classList.remove("move-left", "move-up", "move-right", "move-center");
+      result.textContent = "점수가 초기화됐어요. 다시 대결해 보세요!";
+    });
+  </script>
+</body>
+</html>
